@@ -1146,6 +1146,18 @@ class RoundTripToJaxTest(tf_test_util.JaxToTfTestCase):
         jax2tf.call_tf(tf_f), argnums=(1,))(x, {"y": y, "other": None})
     self.assertDictEqual(actual[0], {"y": x, "other": None})
 
+  def test_grad_pytree_arg_structure_mutated(self):
+    def tf_f(x, params):
+      # params is mutated in-place
+      params.pop("z")
+      return x * params["y"]
+
+    x = jnp.array(1.0)
+    y = jnp.array(2.0)
+    z = jnp.array(3.0)
+    actual = jax.grad(jax2tf.call_tf(tf_f), argnums=(1,))(x, {"y": y, "z": z})
+    self.assertDictEqual(actual[0], {"y": x, "z": jnp.array(0.0)})
+
 
 class RoundTripToTfTest(tf_test_util.JaxToTfTestCase):
   "Reloading output of call_tf into TF with jax2tf."
