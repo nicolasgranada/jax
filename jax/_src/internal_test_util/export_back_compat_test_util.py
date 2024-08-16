@@ -245,6 +245,7 @@ data_{datetime.date.today().strftime('%Y_%m_%d')} = dict(
     logging.info("Writing the updated testdata at %s", output_file)
     with open(output_file, "w") as f:
       f.write(updated_testdata)
+    print(updated_testdata)
 
     if rtol is None:
       rtol = 1.e-7
