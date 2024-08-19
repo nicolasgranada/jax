@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Sequence
+import dataclasses
 from functools import partial, reduce
 import itertools
 from typing import Any
@@ -1016,7 +1017,7 @@ def pallas_call(
     debug: bool = False,
     interpret: bool = False,
     name: str | None = None,
-    compiler_params: dict[str, Any] | None = None,
+    compiler_params: dict[str, Any] | pallas_core.CompilerParams | None = None,
     cost_estimate: CostEstimate | None = None,
 ) -> Callable[..., Any]:
   """Invokes a Pallas kernel on some inputs.
@@ -1058,7 +1059,8 @@ def pallas_call(
       where the kernel function is defined, .e.g:
       `{name} for kernel function {kernel_name} at {file}:{line}`.
       If missing, then we use `{kernel_name} at {file}:{line}`.
-    compiler_params: TO BE DOCUMENTED.
+    compiler_params: Optional compiler parameters. See platform
+      specific config documentation for details.
 
   Returns:
     A function that can be called on a number of positional array arguments to
@@ -1070,6 +1072,13 @@ def pallas_call(
       name, kernel_src_info)
   if compiler_params is None:
     compiler_params = {}
+  if isinstance(compiler_params, pallas_core.CompilerParams):
+    if compiler_params.PLATFORM not in ["mosaic", "triton"]:
+      raise ValueError(
+          f"Unknown platform in compiler params: {compiler_params.PLATFORM}")
+    compiler_params = {
+        compiler_params.PLATFORM: dataclasses.asdict(compiler_params)
+    }
 
   if grid_spec is None:
     grid_spec = GridSpec(grid, in_specs, out_specs)
