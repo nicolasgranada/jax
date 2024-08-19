@@ -15,9 +15,7 @@ limitations under the License.
 
 #include "jaxlib/gpu/linalg_kernels.h"
 
-#include <array>
 #include <cstdint>
-#include <iostream>
 
 #include "jaxlib/gpu/vendor.h"
 
@@ -47,7 +45,6 @@ __device__ void drotg(T* da, T* db, T* c, T* s) {
   T rh = rhypot(a, b);
   *c = a * rh;
   *s = -(b * rh);
-  return;
 }
 
 template <typename T>
@@ -122,6 +119,53 @@ void LaunchCholeskyUpdateKernel(gpuStream_t stream, void** buffers,
       LaunchCholeskyUpdateKernelBody<float>(stream, buffers, grid_dim,
                                             block_dim, nSize);
       break;
+  }
+}
+
+template <typename T>
+void LaunchCholeskyUpdateFfiKernelBody(gpuStream_t stream, void* matrix,
+                                       void* vector, int grid_dim,
+                                       int block_dim, int nSize) {
+  T* rMatrix = reinterpret_cast<T*>(matrix);
+  T* uVector = reinterpret_cast<T*>(vector);
+
+  void* arg_ptrs[3] = {
+      reinterpret_cast<void*>(&rMatrix),
+      reinterpret_cast<void*>(&uVector),
+      reinterpret_cast<void*>(&nSize),
+  };
+#ifdef JAX_GPU_HIP
+  hipLaunchCooperativeKernel((void*)CholeskyUpdateKernel<T>, grid_dim,
+                             block_dim, arg_ptrs,
+                             /*dynamic_shared_mem_bytes=*/0, stream);
+#else  // JAX_GPU_CUDA
+  cudaLaunchCooperativeKernel((void*)CholeskyUpdateKernel<T>, grid_dim,
+                              block_dim, arg_ptrs,
+                              /*dynamic_shared_mem_bytes=*/0, stream);
+#endif
+}
+
+void LaunchCholeskyUpdateFfiKernel(gpuStream_t stream, void* matrix,
+                                   void* vector, int size,
+                                   bool is_single_precision) {
+  int dev = 0;
+#ifdef JAX_GPU_HIP
+  hipDeviceProp_t deviceProp;
+  hipGetDeviceProperties(&deviceProp, dev);
+#else  // JAX_GPU_CUDA
+  cudaDeviceProp deviceProp;
+  cudaGetDeviceProperties(&deviceProp, dev);
+#endif
+
+  int block_dim = deviceProp.maxThreadsPerBlock;
+  int grid_dim = deviceProp.multiProcessorCount;
+
+  if (is_single_precision) {
+    LaunchCholeskyUpdateFfiKernelBody<float>(stream, matrix, vector, grid_dim,
+                                             block_dim, size);
+  } else {
+    LaunchCholeskyUpdateFfiKernelBody<double>(stream, matrix, vector, grid_dim,
+                                              block_dim, size);
   }
 }
 
