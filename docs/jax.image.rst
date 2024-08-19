@@ -15,3 +15,4 @@ Image manipulation functions
     resize
     scale_and_translate
 
+**Test___12***
