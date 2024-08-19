@@ -457,7 +457,7 @@ class FragmentedArray:
       new_registers[idx] = convert(new_reg_ty, reg)
     return FragmentedArray(_registers=new_registers, _layout=self.layout)
 
-  def reduce_sum(self, scratch) -> ir.Value:
+  def reduce_sum(self, ctx, scratch) -> ir.Value:
     index = ir.IndexType.get()
     if not isinstance(self.layout, WGStridedFragLayout):
       raise NotImplementedError(f"Unsupported layout {self.layout}")
@@ -481,7 +481,7 @@ class FragmentedArray:
     warp_result = utils.warp_tree_reduce(result, op, 32)
     warp_id = arith.divui(gpu.thread_id(gpu.Dimension.x), c(32, index))
     memref.store(warp_result, scratch, [warp_id])
-    utils.commit_shared()
+    ctx.commit_shared()
     zero_index = c(0, index)
     with mgpu.single_thread():
       scratch_vec = vector.load(
@@ -493,7 +493,7 @@ class FragmentedArray:
           self.mlir_dtype, vector.CombiningKind.ADD, scratch_vec
       )
       memref.store(scratch_sum, scratch, [zero_index])
-    utils.commit_shared()
+    ctx.commit_shared()
     return memref.load(scratch, [zero_index])
 
   def reduce(self, op, axis):

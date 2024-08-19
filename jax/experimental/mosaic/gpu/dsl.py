@@ -34,7 +34,6 @@ from .utils import (
     Partition1D,
     bytewidth,
     c,
-    commit_shared,
     debug_print,
     ds,
     fori,
@@ -48,6 +47,7 @@ from .utils import (
     tile_shape,
     warp_idx,
     warpgroup_idx,
+    when,
 )
 from .wgmma import (
     WGMMAAccumulator,

@@ -56,6 +56,7 @@ partial = functools.partial
 class ModuleContext:
   name: str
   grid_mapping: pallas_core.GridMapping
+  launch_context: mosaic_gpu.LaunchContext
   runtime_smem: ir.Value  # ir.MemRefType
   smem_used_bytes: int
 
@@ -222,7 +223,11 @@ def lower_jaxpr_to_module(
     [barrier] = cast(mgpu.BarrierRef, barriers)
 
     module_ctx = ModuleContext(
-        name_and_src_info.name, grid_mapping, runtime_smem, smem_used_bytes=0
+        name_and_src_info.name,
+        grid_mapping,
+        launch_ctx,
+        runtime_smem,
+        smem_used_bytes=0,
     )
     program_ids = map(_program_id, range(len(grid_mapping.grid)))
     start_indices = map(
@@ -255,7 +260,7 @@ def lower_jaxpr_to_module(
       barrier.wait()
 
     _ = lower_jaxpr_to_mosaic_gpu(module_ctx, jaxpr, buffers_smem)
-    mgpu.commit_shared()
+    launch_ctx.commit_shared()
 
     for start_indices, b_gmem, b_smem in zip(
         out_start_indices, out_buffers_gmem, out_buffers_smem
@@ -463,7 +468,8 @@ def _reduce_sum_lowering_rule(ctx: LoweringRuleContext, x, *, axes):
   _, [scratch] = ctx.module_context.scratch_view(
       [jax.ShapeDtypeStruct(shape=(4,), dtype=x_aval.dtype)]
   )
-  return mgpu.FragmentedArray.splat(x.reduce_sum(scratch), ())
+  lctx = ctx.module_context.launch_context
+  return mgpu.FragmentedArray.splat(x.reduce_sum(lctx, scratch), ())
 
 
 @register_lowering_rule(primitives.debug_print_p)

@@ -497,8 +497,25 @@ class LaunchContext:
       self, allow_groups: int, await_read_only: bool = False
   ):
     nvvm.cp_async_bulk_wait_group(allow_groups, read=await_read_only)
-    # TODO(apaszke): Use a warpgroup barrier!!!
-    gpu.barrier()  # Groups are supposedly tracked per-thread
+    self.warpgroup_barrier()
+
+  def commit_shared(self):
+    self.warpgroup_barrier()
+    nvvm.fence_proxy(
+        nvvm.ProxyKind.async_shared, space=nvvm.SharedSpace.shared_cta
+    )
+
+  def warpgroup_barrier(self):
+    # gpu.barrier() uses barrier number 0, and it would be unsafe to reuse it,
+    # so we shift the warpgroup index by 1.
+    i32 = ir.IntegerType.get_signless(32)
+    llvm.inline_asm(
+        ir.Type.parse("!llvm.void"),
+        [arith.addi(utils.warpgroup_idx(sync=False), c(1, i32))],
+        f"bar.sync $0, {utils.WARPGROUP_SIZE};",
+        "r",
+        has_side_effects=True,
+    )
 
 
 # ShapeTrees currently can not contain unions.

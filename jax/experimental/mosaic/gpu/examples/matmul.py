@@ -285,7 +285,7 @@ def build_kernel(
     with ctx.named_region("SMEM store"):
       acc_val = wgmma_impl.get_result(stage_loop_body.result)
       acc_val.astype(out_mlir_dtype).store_tiled(epilogue_smem, swizzle=out_swizzle)
-      commit_shared()  # Make sure the stores are visible to TMA.
+      ctx.commit_shared()  # Make sure the stores are visible to TMA.
 
     with ctx.named_region("GMEM store"):
       ctx.async_copy(

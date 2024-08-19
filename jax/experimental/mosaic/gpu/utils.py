@@ -502,13 +502,6 @@ def parse_indices(
   return base_indices, slice_shape, is_squeezed
 
 
-def commit_shared():
-  gpu.barrier()
-  nvvm.fence_proxy(
-      nvvm.ProxyKind.async_shared, space=nvvm.SharedSpace.shared_cta
-  )
-
-
 @dataclasses.dataclass(frozen=True)
 class BarrierRef:
   base_address: ir.Value
